@@ -1118,7 +1118,6 @@ public class ChromeSocketsTcp extends CordovaPlugin {
               
               if (bytesRead < 0) {
                   throw new ClosedChannelException();
-                  //throw new ClosedChannelException("Socket closed by remote peer");
               }
               if (bytesRead == 0) {
                   Log.w(LOG_TAG, "no data read from socket");
