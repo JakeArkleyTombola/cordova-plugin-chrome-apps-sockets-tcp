@@ -1105,52 +1105,55 @@ public class ChromeSocketsTcp extends CordovaPlugin {
     }
 
     // This method can be only called by selector thread.
-    int read() throws JSONException {
-      int bytesRead = 0;
-      if (paused) {
-        // Remove read interests to avoid seletor wakeup when readable.
-        removeInterestSet(SelectionKey.OP_READ);
-        return 0;
-      }
-
-      try {
-        bytesRead = channel.read(receiveDataBuffer);
-
-        if (bytesRead < 0) {
-            throw new ClosedChannelException("Socket closed by remote peer");
-        }
-        if (bytesRead == 0) {
-          Log.w(LOG_TAG, "no data read from socket");
-          return 0;
-        }
-
-        if (sslEngine != null) {
-          SSLEngineResult res = tryUnwrapReceiveData();
-
-          if (res.getStatus() == SSLEngineResult.Status.OK) {
-            sendReceive(sslPeerAppBuffer);
+      int read() throws JSONException {
+          int bytesRead = 0;
+          if (paused) {
+              // Remove read interests to avoid seletor wakeup when readable.
+              removeInterestSet(SelectionKey.OP_READ);
+              return 0;
           }
-          // else: need to wait for more data.
-        } else {
-          receiveDataBuffer.flip();
-          sendReceive(receiveDataBuffer);
-          receiveDataBuffer.clear();
-        }
-      } catch (IOException e) {
-        int code =  -2;
-        if (e instanceof ClosedChannelException) {
-            code = -100;
-        } else if (e instanceof NotYetConnectedException) {
-            code = -15;
-        }
-        JSONObject info = buildErrorInfo(code, e.getMessage());
-        info.put("socketId", socketId);
-        sendReceiveEvent(new PluginResult(Status.ERROR, info));
-        return -1;
-      } catch (JSONException e) {
+          
+          try {
+              bytesRead = channel.read(receiveDataBuffer);
+              
+              if (bytesRead < 0) {
+                  throw new ClosedChannelException();
+                  //throw new ClosedChannelException("Socket closed by remote peer");
+              }
+              if (bytesRead == 0) {
+                  Log.w(LOG_TAG, "no data read from socket");
+                  return 0;
+              }
+              
+              if (sslEngine != null) {
+                  SSLEngineResult res = tryUnwrapReceiveData();
+                  
+                  if (res.getStatus() == SSLEngineResult.Status.OK) {
+                      sendReceive(sslPeerAppBuffer);
+                  }
+                  // else: need to wait for more data.
+              } else {
+                  receiveDataBuffer.flip();
+                  sendReceive(receiveDataBuffer);
+                  receiveDataBuffer.clear();
+              }
+          } catch (IOException e) {
+              int code =  (e instanceof ClosedChannelException) ? -100 : -2;
+              JSONObject info = buildErrorInfo(code, e.getMessage());
+              info.put("socketId", socketId);
+              sendReceiveEvent(new PluginResult(Status.ERROR, info));
+              return -1;
+          }
+          catch (NotYetConnectedException e) {
+              JSONObject info = buildErrorInfo(-15, e.getMessage());
+              info.put("socketId", socketId);
+              sendReceiveEvent(new PluginResult(Status.ERROR, info));
+              return -1;
+          }
+          catch (JSONException e) {
+          }
+          return bytesRead;
       }
-      return bytesRead;
-    }
 
     private void sendReceive(ByteBuffer data) throws JSONException, IOException {
       byte[] recvBytes = null;
